@@ -72,6 +72,9 @@ jobs:
 
           echo "Creating remote directory..."
           ssh -o StrictHostKeyChecking=no $SERVER "mkdir -p /${{ secrets.LOCATION }}"
+          
+          echo "Stopping service before upload..."
+          ssh -o StrictHostKeyChecking=no $SERVER "sudo systemctl stop gridflex"
 
           echo "Uploading JAR..."
           rsync -az --delete -e "ssh -o StrictHostKeyChecking=no" \
@@ -109,34 +112,14 @@ jobs:
           
           ssh -o StrictHostKeyChecking=no $SERVER "chmod 600 /${{ secrets.LOCATION }}/.env.gridflex"
 
-          echo "Deploying (safe SSH execution)..."
-          ssh -o StrictHostKeyChecking=no $SERVER 'bash -s' << 'EOF'
+          echo "Starting service..."
+          ssh -o StrictHostKeyChecking=no $SERVER "sudo systemctl start gridflex"
 
-            set -e
+          echo "Verifying service is running..."
+          ssh -o StrictHostKeyChecking=no $SERVER "sleep 5 && sudo systemctl is-active gridflex"
 
-            echo "Stopping app safely..."
-
-            PID=$(ps -ef | grep gridflex-backend-service.jar | grep -v grep | awk '{print $2}')
-
-            if [ -n "$PID" ]; then
-              echo "Killing PID: $PID"
-              kill -9 $PID || true
-            else
-              echo "No running process found"
-            fi
-
-            echo "Starting app..."
-          
-            set -a
-            source /${{ secrets.LOCATION }}/.env.gridflex
-            set +a
-
-            nohup java -Dspring.profiles.active=staging \
-              -jar /${{ secrets.LOCATION }}/gridflex-backend-service.jar \
-              >/dev/null 2>&1 < /dev/null &
-
-            echo "Deployment complete"
-          EOF
+          echo "Deployment complete"
+    
 
       # =====================================================
       # SSH SETUP (PRODUCTION)
@@ -228,7 +211,7 @@ jobs:
 
 
 
-  deploy-windows:
+  deploy-alfuttaim:
 
     if: github.ref == 'refs/heads/alfuttaim'
 
